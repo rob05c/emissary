@@ -14,7 +14,7 @@ defmodule Emissary.Mixfile do
   #
   # Type "mix help compile.app" for more information
   def application do
-    [applications: [:logger, :cowboy],
+    [applications: [:logger, :cowboy, :plug],
      mod: {Emissary, []}]
   end
 
@@ -29,7 +29,8 @@ defmodule Emissary.Mixfile do
   # Type "mix help deps" for more examples and options
   defp deps do
     [
-      { :cowboy, "~> 1.0.0"}
+      { :cowboy, "~> 1.0.0"},
+      { :plug, "~> 1.0"}
     ]
   end
 end

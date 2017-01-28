@@ -6,10 +6,8 @@ defmodule Emissary do
   def start(_type, _args) do
     import Supervisor.Spec, warn: false
 
-    Cowboy.Dispatch.start
-
-    # Define workers and child supervisors to be supervised
     children = [
+      Plug.Adapters.Cowboy.child_spec(:http, EmissaryRouter, [], [port: 8080])
       # Starts a worker by calling: Emissary.Worker.start_link(arg1, arg2, arg3)
       # worker(Emissary.Worker, [arg1, arg2, arg3]),
     ]
