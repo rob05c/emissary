@@ -1,6 +1,6 @@
 # Emissary
 
-**TODO: Add description**
+HTTP server in Elixir using Cowboy.
 
 ## Installation
 
