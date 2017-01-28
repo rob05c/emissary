@@ -4,6 +4,7 @@ defmodule Cowboy.Dispatch do
       { :_,
         [
           {"/", Cowboy.RootPageHandler, []},
+          {"/[...]", Cowboy.RootPageHandler, []},
           # serves files in /priv
           # {"/[...]", :cowboy_static, { :priv_dir, :emissary, "",[{:mimetypes,:cow_mimetypes,:all}]}}
         ]
