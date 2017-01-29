@@ -7,7 +7,8 @@ defmodule Emissary do
     import Supervisor.Spec, warn: false
 
     children = [
-      Plug.Adapters.Cowboy.child_spec(:http, EmissaryRouter, [], [port: 8080])
+      Plug.Adapters.Cowboy.child_spec(:http, EmissaryRouter, [], [port: 8080]),
+      worker(Emissary.RemapManager, [Emissary.RemapManager])
       # Starts a worker by calling: Emissary.Worker.start_link(arg1, arg2, arg3)
       # worker(Emissary.Worker, [arg1, arg2, arg3]),
     ]
@@ -17,4 +18,5 @@ defmodule Emissary do
     opts = [strategy: :one_for_one, name: Emissary.Supervisor]
     Supervisor.start_link(children, opts)
   end
+
 end

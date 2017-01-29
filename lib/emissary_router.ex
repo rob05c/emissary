@@ -17,7 +17,9 @@ defmodule EmissaryRouter do
   end
 
   match _ do
-    s = "You're at " <> conn.request_path <> add_qs(conn.query_string)
+    {:ok, rule} = Emissary.RemapManager.lookup(Emissary.RemapManager, "http://foo.localhost")
+    s = "foo.localhost map: " <> rule <> "\r\n"
+    # s = "You're at " <> conn.request_path <> add_qs(conn.query_string)
     send_resp(conn, 200, s)
   end
 end
