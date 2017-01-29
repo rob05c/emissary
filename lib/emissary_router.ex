@@ -16,10 +16,21 @@ defmodule EmissaryRouter do
     end
   end
 
+  def domain_to_remap(conn) do
+    Atom.to_string(conn.scheme) <> "://" <> conn.host
+  end
+
   match _ do
-    {:ok, rule} = Emissary.RemapManager.lookup(Emissary.RemapManager, "http://foo.localhost")
-    s = "foo.localhost map: " <> rule <> "\r\n"
-    # s = "You're at " <> conn.request_path <> add_qs(conn.query_string)
-    send_resp(conn, 200, s)
+    request_domain = domain_to_remap(conn)
+
+    case Emissary.RemapManager.lookup(Emissary.RemapManager, request_domain) do
+      {:ok, remapped_domain} ->
+        remapped_url = remapped_domain <> conn.request_path <> add_qs(conn.query_string) <> "\r\n"
+      s = " -> " <> remapped_url <> "\r\n"
+      send_resp(conn, 200, s)
+      _ ->
+        # \todo log
+        send_resp(conn, 404, "not found")
+    end
   end
 end
