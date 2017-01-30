@@ -23,13 +23,15 @@ defmodule EmissaryRouter do
   match _ do
     request_domain = domain_to_remap(conn)
 
-    case Emissary.RemapManager.lookup(Emissary.RemapManager, request_domain) do
+    case Emissary.RemapManager.get(Emissary.RemapManager, request_domain) do
       {:ok, remapped_domain} ->
         remapped_url = remapped_domain <> conn.request_path <> add_qs(conn.query_string) <> "\r\n"
-      s = " -> " <> remapped_url <> "\r\n"
-      send_resp(conn, 200, s)
+
+        IO.puts "getting " <> remapped_url
+        {:ok, code, body} = Emissary.CacheManager.fetch(remapped_url)
+        send_resp(conn, code, body)
       _ ->
-        # \todo log
+        IO.puts "requested domain not found, returning 404 " <> request_domain
         send_resp(conn, 404, "not found")
     end
   end

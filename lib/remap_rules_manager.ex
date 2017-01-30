@@ -7,7 +7,7 @@ defmodule Emissary.RemapManager do
     GenServer.start_link(__MODULE__, :ok, name: name)
   end
 
-  def lookup(server, rule) do
+  def get(server, rule) do
     GenServer.call(server, {:lookup, rule})
   end
 

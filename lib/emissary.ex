@@ -1,6 +1,8 @@
 defmodule Emissary do
   use Application
 
+  @cache_max_bytes 1_000_000_000
+
   # See http://elixir-lang.org/docs/stable/elixir/Application.html
   # for more information on OTP Applications
   def start(_type, _args) do
@@ -8,7 +10,8 @@ defmodule Emissary do
 
     children = [
       Plug.Adapters.Cowboy.child_spec(:http, EmissaryRouter, [], [port: 8080]),
-      worker(Emissary.RemapManager, [Emissary.RemapManager])
+      worker(Emissary.RemapManager, [Emissary.RemapManager]),
+      worker(Emissary.CacheManager, [Emissary.CacheManager, @cache_max_bytes])
       # Starts a worker by calling: Emissary.Worker.start_link(arg1, arg2, arg3)
       # worker(Emissary.Worker, [arg1, arg2, arg3]),
     ]
