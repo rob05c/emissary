@@ -117,7 +117,7 @@ defmodule Emissary.CacheManager do
         # \todo request in serial, so we don't flood an origin if a million requests come in at once.
         IO.puts "not found in cache, getting from origin `" <> url <> "`"
         # \todo fix query params
-        case HTTPoison.get(url, [], []) do
+        case Emissary.RequestManager.request(url) do
           {:ok, response} ->
             IO.puts "caching " <> url
             resp = to_response response
@@ -125,11 +125,11 @@ defmodule Emissary.CacheManager do
             {:ok, resp.code, resp.headers, resp.body}
           {:error, err} ->
             IO.puts "origin failed with " <> HTTPoison.Error.message(err)
-            {:ok, 500, "origin server error"} # \todo change to generic 500
+            {:ok, 500, %{}, "origin server error"} # \todo change to generic 500
           _ -> # should never happen
             IO.puts "origin returned unknown value"
             # \todo put in cache, so we don't continuously hit dead origins?
-            {:ok, 500, "internal server error"}
+            {:ok, 500, %{}, "internal server error"}
         end
     end
   end
