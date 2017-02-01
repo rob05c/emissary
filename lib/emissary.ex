@@ -2,6 +2,7 @@ defmodule Emissary do
   use Application
 
   @cache_max_bytes 1_000_000_000
+  # \todo add follow-redirects config
 
   # See http://elixir-lang.org/docs/stable/elixir/Application.html
   # for more information on OTP Applications

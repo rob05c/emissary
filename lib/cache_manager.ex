@@ -7,6 +7,11 @@ defmodule Emissary.CacheManager do
     defstruct table: "", lru_table: "", bytes: 0, max_bytes: 0
   end
 
+  defmodule Response do
+    @enforce_keys [:code, :headers, :body]
+    defstruct headers: %{}, body: "", code: 0
+  end
+
   def start_link(name, max_bytes) do
     GenServer.start_link __MODULE__, {name, max_bytes}, name: name
   end
@@ -50,7 +55,7 @@ defmodule Emissary.CacheManager do
       eldest_lru_index = :ets.first(data.lru_table)
       [{_, url}] = :ets.lookup(data.lru_table, eldest_lru_index)
       [{_, _, val}] = :ets.lookup(data.table, url)
-      val_bytes = byte_size val
+      val_bytes = byte_size val.body
       data = Map.put data, :bytes, data.bytes - val_bytes
       :ets.delete(data.lru_table, eldest_lru_index)
       :ets.delete(data.table, url)
@@ -74,12 +79,28 @@ defmodule Emissary.CacheManager do
     lru_index = :erlang.unique_integer([:monotonic])
     :ets.insert(data.lru_table, {lru_index, url})
     :ets.insert(data.table, {url, lru_index, val})
-    val_bytes = byte_size val
+    val_bytes = byte_size val.body
     new_bytes = data.bytes + val_bytes
     data = Map.put data, :bytes, new_bytes
     IO.puts "cache inserted " <> url <> " size " <> Integer.to_string(val_bytes) <> " (" <> Integer.to_string(new_bytes) <> "/" <> Integer.to_string(data.max_bytes) <> ")"
     data = prune data
     {:noreply, data}
+  end
+
+  def headers_to_map(poison_response) do
+    {_, headers} = Enum.map_reduce poison_response, %{}, fn(header, acc) ->
+      {k, v} = header
+      acc = Map.put acc, k, v
+      {{k, v}, acc}
+    end
+    headers
+  end
+
+  def to_response(response) do
+    body = response.body
+    code = response.status_code
+    headers = headers_to_map(response.headers)
+    %Response{body: body, code: code, headers: headers}
   end
 
   # fetch gets the given URL from the cache, using all cache control mechanisms.
@@ -90,18 +111,18 @@ defmodule Emissary.CacheManager do
     case Emissary.CacheManager.get Emissary.CacheManager, url do
       {:ok, val} ->
         IO.puts "found in cache " <> url
-        {:ok, 200, val} # \todo handle expired entries
+        {:ok, val.code, val.headers, val.body} # \todo handle expired entries
       :error ->
         # \todo extract method?
         # \todo request in serial, so we don't flood an origin if a million requests come in at once.
-        IO.puts "not found in cache, getting from origin " <> url
+        IO.puts "not found in cache, getting from origin `" <> url <> "`"
         # \todo fix query params
         case HTTPoison.get(url, [], []) do
           {:ok, response} ->
             IO.puts "caching " <> url
-            # \todo cache headers, code
-            Emissary.CacheManager.set(Emissary.CacheManager, url, response.body)
-            {:ok, 200, response.body}
+            resp = to_response response
+            Emissary.CacheManager.set(Emissary.CacheManager, url, resp)
+            {:ok, resp.code, resp.headers, resp.body}
           {:error, err} ->
             IO.puts "origin failed with " <> HTTPoison.Error.message(err)
             {:ok, 500, "origin server error"} # \todo change to generic 500
