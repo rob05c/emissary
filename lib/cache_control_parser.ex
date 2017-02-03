@@ -1,4 +1,5 @@
 defmodule Emissary.CacheControl do
+  # \todo downcase keys
   def parse(headers) do
     case Map.fetch(headers, "cache-control") do
       {:ok, cache_control_str} ->
