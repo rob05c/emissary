@@ -90,7 +90,7 @@ defmodule Emissary.CacheManager do
   def headers_to_map(poison_response) do
     {_, headers} = Enum.map_reduce poison_response, %{}, fn(header, acc) ->
       {k, v} = header
-      acc = Map.put acc, k, v
+      acc = Map.put acc, String.downcase(k), v
       {{k, v}, acc}
     end
     headers
@@ -107,7 +107,7 @@ defmodule Emissary.CacheManager do
   # It's assumed the CacheManager is a singleton worker with the package name as the process name
   # If the URL is already in the cache, and hasn't expired, it's returned from cache.
   # If the URL is not in the cache, or has expired, it's requested from its origin, and stored in the cache
-  def fetch(url) do
+  def fetch(request_headers_list, url) do
     case Emissary.CacheManager.get Emissary.CacheManager, url do
       {:ok, val} ->
         IO.puts "found in cache " <> url
@@ -119,8 +119,16 @@ defmodule Emissary.CacheManager do
         # \todo fix query params
         case Emissary.RequestManager.request(url) do
           {:ok, response} ->
-            IO.puts "caching " <> url
             resp = to_response response
+
+            # \todo add response headers cache-control
+            request_headers = headers_to_map(request_headers_list)
+            req_cache_control = Emissary.CacheControl.parse(request_headers)
+            IO.puts("cache_control:")
+            IO.inspect(req_cache_control)
+            # \todo check can_cache?
+            IO.puts "caching " <> url
+
             Emissary.CacheManager.set(Emissary.CacheManager, url, resp)
             {:ok, resp.code, resp.headers, resp.body}
           {:error, err} ->
