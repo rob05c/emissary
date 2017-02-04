@@ -24,8 +24,6 @@ defmodule Emissary.Rules do
     can_store_response?(req_headers, resp_code, resp_headers, resp_body, req_cache_control, resp_cache_control)
     # \todo implement RFC7234§3.1 incomplete response storage
     && can_store_authenticated?(req_headers, resp_code, resp_headers, resp_body, req_cache_control, resp_cache_control)
-
-
   end
 
   # can_store_response? checks the constraints in RFC7234§3.2
@@ -37,7 +35,7 @@ defmodule Emissary.Rules do
     || Map.has_key?(resp_cache_control,  "s-maxage")
   end
 
-  # can_store_response? checks the constraints in RFC7234§3
+  # can_store_response? checks the constraints in RFC7234
   def can_store_response?(req_headers, resp_code, resp_headers, resp_body, req_cache_control, resp_cache_control) do
     code_understood?(resp_code)
     && !Map.has_key?(req_cache_control,  "no-store")
@@ -98,11 +96,12 @@ defmodule Emissary.Rules do
           false
         else
           # \todo extract method?
-          vary_header = String.downcase(vary_header)
-          vary_fields = String.split(vary_header, ",")
-          Enum.all? vary_fields, fn(field) ->
+          vary_header
+          |> String.downcase
+          |> String.split(",")
+          |> Enum.all?(fn(field) ->
             Map.has_key? resp_req_headers, field
-          end
+          end)
         end
       _ ->
         true
