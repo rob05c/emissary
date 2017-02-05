@@ -15,9 +15,12 @@ defmodule Emissary.CacheManager do
     GenServer.call server, {:get, url}
   end
 
-  # \todo change val from a string to a struct containing headers etc
   def set(server, url, val) do
     GenServer.cast server, {:set, url, val}
+  end
+
+  def delete(server, url) do
+    GenServer.cast server, {:delete, url}
   end
 
   def init({name, max_bytes}) do
@@ -82,35 +85,76 @@ defmodule Emissary.CacheManager do
     {:noreply, data}
   end
 
+  def handle_cast({:delete, url}, data) do
+    [{_, lru_index, _}] = :ets.lookup(data.table, url)
+    :ets.delete(data.lru_table, lru_index)
+    :ets.delete(data.table, url)
+    {:noreply, data}
+  end
+
   # fetch gets the given URL from the cache, using all cache control mechanisms.
   # It's assumed the CacheManager is a singleton worker with the package name as the process name
   # If the URL is already in the cache, and hasn't expired, it's returned from cache.
   # If the URL is not in the cache, or has expired, it's requested from its origin, and stored in the cache
   def fetch(request_headers_list, url) do
     case Emissary.CacheManager.get Emissary.CacheManager, url do
-      {:ok, val} ->
+      {:ok, resp} ->
         IO.puts "found in cache " <> url
-        {:ok, val.code, val.headers, val.body} # \todo handle expired entries
+        req_headers = Emissary.RequestManager.headers_to_map(request_headers_list)
+        # TODO: put in Response struct?
+        resp_req_cache_control = Emissary.CacheControl.parse(resp.request_headers)
+        resp_cache_control = Emissary.CacheControl.parse(resp.headers)
+
+        case Emissary.Rules.can_reuse_stored? req_headers, resp.headers, resp_req_cache_control, resp_cache_control, resp.request_headers, resp.request_time, resp.response_time do
+          :must_revalidate ->
+            IO.puts "revalidating cache " <> url
+            origin_revalidate(url, resp)
+          :true ->
+            IO.puts "using cached " <> url
+            {:ok, resp.code, resp.headers, resp.body}
+          :false ->
+            IO.puts "can't use cached " <> url
+            origin_request(url, request_headers_list)
+        end
       :error ->
-        IO.puts "not found in cache, getting from origin `" <> url <> "`"
-        # \todo fix query params
+        IO.puts "not found in cache " <> url
         origin_request(url, request_headers_list)
     end
   end
 
   def origin_request(url, request_headers_list) do
-    resp = Emissary.RequestManager.request(url, request_headers_list)
-    req_cache_control = Emissary.CacheControl.parse(resp.request_headers)
-    IO.puts("cache_control:")
-    IO.inspect(req_cache_control)
-    IO.puts "caching " <> url
-    # TODO: check rules
-    if resp.code < 500 do
-      Emissary.CacheManager.set(Emissary.CacheManager, url, resp)
-    else
-      nil
-    end
+        IO.puts "getting from origin `" <> url <> "`"
+        # \todo fix query params
 
+        resp = Emissary.RequestManager.request(url, request_headers_list)
+        cache(url, resp)
+        {:ok, resp.code, resp.headers, resp.body}
+  end
+
+  def origin_revalidate(url, old_response) do
+    IO.puts "revalidating from origin `" <> url <> "`"
+    resp = Emissary.RequestManager.revalidate(url, old_response)
+    if cache url, resp do
+      IO.puts "cached revalidated `" <> url <> "`"
+    else
+      IO.puts "revalidate can't cache, deleting old cached `" <> url <> "`"
+      # TODO: determine if this should be serialised with cache(), to avoid race deleting a newly cached val
+      Emissary.CacheManager.delete(Emissary.CacheManager, url)
+    end
     {:ok, resp.code, resp.headers, resp.body}
+  end
+
+  def cache(url, resp) do
+    if Emissary.Rules.can_cache? resp.request_headers, resp.code, resp.headers do
+      req_cache_control = Emissary.CacheControl.parse(resp.request_headers)
+      IO.puts("cache_control:")
+      IO.inspect(req_cache_control)
+      IO.puts "caching " <> url
+      Emissary.CacheManager.set(Emissary.CacheManager, url, resp)
+      true
+    else
+      IO.puts "can't cache " <> url
+      false
+    end
   end
 end

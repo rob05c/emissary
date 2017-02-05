@@ -33,7 +33,7 @@ defmodule Emissary.RequestManager do
     headers = %{}
     %Response{body: body, code: code, headers: headers, request_headers: request_headers, request_time: request_time, response_time: response_time}
   end
-  
+
   def start_link(name) do
     GenServer.start_link(__MODULE__, :ok, name: name)
   end
@@ -59,14 +59,17 @@ defmodule Emissary.RequestManager do
   def do_revalidate(url, old_response) do
     request_time = DateTime.utc_now()
 
-    headers = []
-    headers = case Map.fetch(old_response, "date") do
-      {:ok, http_date} ->
-        [{"if-modified-since", http_date}|headers]
-      :error ->
-        headers
-    end
+    headers = [] # TODO: add old_response.request_headers?
+    headers = case Map.fetch(old_response.headers, "date") do
+                {:ok, http_date} ->
+                  [{"if-modified-since", http_date}|headers]
+                :error ->
+                  headers
+              end
 
+    IO.puts "revalidating with headers "
+    IO.inspect headers
+    IO.puts " for " <> url
     response = HTTPoison.get(url, headers, [])
 
     response_time = DateTime.utc_now()
@@ -84,14 +87,14 @@ defmodule Emissary.RequestManager do
     {:noreply, data}
   end
 
-  def handle_cast({:revalidate_response, {url, response, old_response, request_time, response_time}}, data) do
+  def handle_cast({:revalidate_response, {url, response, request_time, response_time}}, data) do
     url_pids = data.revalidate_pids
     pids = Map.fetch! url_pids, url
     Enum.each pids, fn(pid) ->
       send pid, {:ok, response, request_time, response_time}
     end
     url_pids = Map.delete url_pids, url
-    data = %{data | request_pids: url_pids}
+    data = %{data | revalidate_pids: url_pids}
     {:noreply, data}
   end
 
@@ -121,7 +124,7 @@ defmodule Emissary.RequestManager do
     end
     pids = [pid | pids]
     url_pids = Map.put url_pids, url, pids
-    data = %{data | request_pids: url_pids}
+    data = %{data | revalidate_pids: url_pids}
     {:noreply, data}
   end
 
@@ -152,6 +155,7 @@ defmodule Emissary.RequestManager do
           {:ok, response} ->
             case response.status_code do
               304 ->
+                IO.puts "revalidate got 304 for " <> url
                 # defstruct headers: %{}, body: "", code: 0, request_headers: %{}, request_time: nil, response_time: nil
                 %Response{
                   body:            old_resp.body,
@@ -163,6 +167,7 @@ defmodule Emissary.RequestManager do
                     Map.put(headers, k, v)
                   end)}
               _ ->
+                IO.puts "revalidate got " <> Integer.to_string(response.status_code) <> " from " <> url
                 to_response response, old_resp.request_headers, request_time, response_time
             end
 

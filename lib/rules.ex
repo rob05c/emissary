@@ -67,16 +67,23 @@ defmodule Emissary.Rules do
     # TODO: remove allowed_stale, check in cache manager after revalidate fails? (since RFC7234§4.2.4 prohibits serving stale response unless disconnected).
     cond do
       !selected_headers_match?(req_headers, resp_req_headers) ->
+        # TODO: implement caching the same url multiple times for different selected (Vary) headers
+        IO.puts "can_reuse_stored? no - selected headers don't match"
         false
       !fresh?(resp_headers, resp_cache_control, resp_req_time, resp_resp_time) && !allowed_stale?(resp_headers, req_cache_control, resp_cache_control, resp_req_time, resp_resp_time) ->
+        IO.puts "can_reuse_stored? :must_revalidate - not fresh, and not allowed stale"
         :must_revalidate
       has_pragma_no_cache?(req_headers) ->
+        IO.puts "can_reuse_stored? :must_revalidate - has pragma no-cache"
         :must_revalidate
       Map.has_key?(req_cache_control, "no-cache") ->
+        IO.puts "can_reuse_stored? :must_revalidate - request has cache-control no-cache"
         :must_revalidate
       Map.has_key?(resp_cache_control, "no-cache") ->
+        IO.puts "can_reuse_stored? :must_revalidate - response has cache-control no-cache"
         :must_revalidate
       true ->
+        IO.puts "can_reuse_stored? yes"
         true
     end
   end
@@ -136,7 +143,7 @@ defmodule Emissary.Rules do
             false ->
               false
             date ->
-              DateTime.to_unix(expires) - DateTime.to_unix(date)
+              Timex.to_unix(expires) - Timex.to_unix(date)
           end
       end
     end
@@ -174,7 +181,7 @@ defmodule Emissary.Rules do
           false ->
             false
           date ->
-            DateTime.to_unix(date) - DateTime.to_unix(last_modified)
+            Timex.to_unix(date) - Timex.to_unix(last_modified)
         end
     end
   end
@@ -215,21 +222,21 @@ defmodule Emissary.Rules do
       false ->
         :error
       date ->
-        DateTime.to_unix(date)
+        Timex.to_unix(date)
     end
   end
 
   # now is used to calculate current_age per RFC7234§4.2.3. Returns integer UNIX seconds since the epoch.
   def now() do
-    DateTime.to_unix(DateTime.utc_now())
+    Timex.to_unix(DateTime.utc_now())
   end
 
   def request_time(resp_req_time) do
-    DateTime.to_unix(resp_req_time)
+    Timex.to_unix(resp_req_time)
   end
 
   def response_time(resp_resp_time) do
-    DateTime.to_unix(resp_resp_time)
+    Timex.to_unix(resp_resp_time)
   end
 
   def apparent_age(resp_headers, resp_resp_time) do

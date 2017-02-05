@@ -30,7 +30,7 @@ defmodule EmissaryRouter do
         conn = conn
         |> put_resp_header("server", "")
         |> put_resp_header("date", "")
-        |> put_resp_header("content-length", "")
+        |> put_resp_header("content-length", Integer.to_string(byte_size(body)))
         |> delete_resp_header("max-age")
         |> delete_resp_header("cache-control")
 
@@ -38,7 +38,13 @@ defmodule EmissaryRouter do
 
         headers
         |> Enum.reduce(conn, fn({k, v}, conn) ->
-          put_resp_header(conn, String.downcase(k), v)
+          header = String.downcase(k)
+          # TODO: make this generic?
+          if header != "transfer-encoding" do
+            put_resp_header(conn, header, v)
+          else
+            conn
+          end
         end)
         |> send_resp(code, body)
       _ ->
