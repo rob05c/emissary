@@ -86,9 +86,11 @@ defmodule Emissary.CacheManager do
   end
 
   def handle_cast({:delete, url}, data) do
-    [{_, lru_index, _}] = :ets.lookup(data.table, url)
+    [{_, lru_index, val}] = :ets.lookup(data.table, url)
     :ets.delete(data.lru_table, lru_index)
     :ets.delete(data.table, url)
+    val_bytes = byte_size val.body
+    data = Map.put data, :bytes, data.bytes - val_bytes
     {:noreply, data}
   end
 
