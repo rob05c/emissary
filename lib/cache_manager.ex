@@ -7,11 +7,6 @@ defmodule Emissary.CacheManager do
     defstruct table: "", lru_table: "", bytes: 0, max_bytes: 0
   end
 
-  defmodule Response do
-    @enforce_keys [:code, :headers, :body, :request_time, :response_time]
-    defstruct headers: %{}, body: "", code: 0, request_headers: %{}, request_time: nil, response_time: nil
-  end
-
   def start_link(name, max_bytes) do
     GenServer.start_link __MODULE__, {name, max_bytes}, name: name
   end
@@ -87,22 +82,6 @@ defmodule Emissary.CacheManager do
     {:noreply, data}
   end
 
-  def headers_to_map(poison_response) do
-    {_, headers} = Enum.map_reduce poison_response, %{}, fn(header, acc) ->
-      {k, v} = header
-      acc = Map.put acc, String.downcase(k), v
-      {{k, v}, acc}
-    end
-    headers
-  end
-
-  def to_response(response, request_headers, request_time, response_time) do
-    body = response.body
-    code = response.status_code
-    headers = headers_to_map(response.headers)
-    %Response{body: body, code: code, headers: headers, request_headers: request_headers, request_time: request_time, response_time: response_time}
-  end
-
   # fetch gets the given URL from the cache, using all cache control mechanisms.
   # It's assumed the CacheManager is a singleton worker with the package name as the process name
   # If the URL is already in the cache, and hasn't expired, it's returned from cache.
@@ -120,29 +99,18 @@ defmodule Emissary.CacheManager do
   end
 
   def origin_request(url, request_headers_list) do
-    case Emissary.RequestManager.request(url) do
-      {{:ok, response}, request_time, response_time} ->
-        # \todo add response headers cache-control
-        request_headers = headers_to_map(request_headers_list)
-        resp = to_response response, request_headers, request_time, response_time
-
-        # debug
-        req_cache_control = Emissary.CacheControl.parse(request_headers)
-        IO.puts("cache_control:")
-        IO.inspect(req_cache_control)
-
-        # \todo check can_cache?
-        IO.puts "caching " <> url
-        Emissary.CacheManager.set(Emissary.CacheManager, url, resp)
-        {:ok, resp.code, resp.headers, resp.body}
-      {{:error, err}, request_time, response_time} ->
-        IO.puts "origin failed with " <> HTTPoison.Error.message(err)
-        {:ok, 500, %{}, "origin server error"} # \todo change to generic 500
-      unknown -> # should never happen
-        IO.puts "origin returned unknown value"
-        IO.inspect unknown
-        # \todo put in cache, so we don't continuously hit dead origins?
-        {:ok, 500, %{}, "internal server error"}
+    resp = Emissary.RequestManager.request(url, request_headers_list)
+    req_cache_control = Emissary.CacheControl.parse(resp.request_headers)
+    IO.puts("cache_control:")
+    IO.inspect(req_cache_control)
+    IO.puts "caching " <> url
+    # TODO: check rules
+    if resp.code < 500 do
+      Emissary.CacheManager.set(Emissary.CacheManager, url, resp)
+    else
+      nil
     end
+
+    {:ok, resp.code, resp.headers, resp.body}
   end
 end
