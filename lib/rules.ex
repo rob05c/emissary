@@ -98,12 +98,7 @@ defmodule Emissary.Rules do
   def get_http_date(map, key) do
     case Map.fetch(map, key) do
       {:ok, http_date} ->
-        case parse_http_date(http_date) do
-          :invalid ->
-            false
-          datetime ->
-            datetime
-        end
+        parse_http_date(http_date)
       :error ->
         false
     end
@@ -114,15 +109,16 @@ defmodule Emissary.Rules do
     case Map.fetch(map, key) do
       {:ok, seconds_str} ->
         case Integer.parse(seconds_str) do
-          :error ->
-            false
           {seconds, _} ->
             seconds
+          :error ->
+            false
         end
       :error ->
         false
     end
   end
+
   # freshness_lifetime calculates the freshness_lifetime per RFC7234§4.2.1
   def get_freshness_lifetime(resp_headers, resp_cache_control) do
     get_s_maxage = fn() ->
@@ -133,19 +129,10 @@ defmodule Emissary.Rules do
       get_http_delta_seconds(resp_cache_control, "max-age")
     end
 
-    # TODO: rewrite; use `with`?
     get_expires = fn() ->
-      case get_http_date(resp_headers, "expires") do
-        false ->
-          false
-        expires ->
-          case get_http_date(resp_headers, "date") do
-            false ->
-              false
-            date ->
-              Timex.to_unix(expires) - Timex.to_unix(date)
-          end
-      end
+      with {:ok, expires} <- get_http_date(resp_headers, "expires"),
+           {:ok, date} <- get_http_date(resp_headers, "date"),
+            do: Timex.to_unix(expires) - Timex.to_unix(date)
     end
 
     get_heuristic = fn() ->
@@ -159,7 +146,7 @@ defmodule Emissary.Rules do
   end
 
   @seconds_in_24_hours 60*60*24
-  
+
   # heuristic_freshness follows the recommendation of RFC7234§4.2.2 and returns the min of 10% of the (Date - Last-Modified) headers and 24 hours, if they exist, and 24 hours if they don't.
   # TODO: smarter and configurable heuristics
   def heuristic_freshness(resp_headers) do
@@ -173,17 +160,9 @@ defmodule Emissary.Rules do
 
   # TODO combine with get_expires?
   def since_last_modified(headers) do
-    case get_http_date(headers, "last-modified") do
-      false ->
-        false
-      last_modified ->
-        case get_http_date(headers, "date") do
-          false ->
-            false
-          date ->
-            Timex.to_unix(date) - Timex.to_unix(last_modified)
-        end
-    end
+    with {:ok, last_modified} <- get_http_date(headers, "last-modified"),
+         {:ok, date} <- get_http_date(headers, "date"),
+      do: Timex.to_unix(date) - Timex.to_unix(last_modified)
   end
 
   # parse_http_date parses the given HTTP-date (RFC7231§7.1.1) and returns a DateTime or :invalid
@@ -195,13 +174,12 @@ defmodule Emissary.Rules do
     Enum.find_value formats, :invalid, fn(format) ->
       case Timex.parse(http_date, format, :strftime) do
         {:ok, datetime} ->
-          datetime
+          {:ok, datetime}
         {:error, _} ->
           false
         naive_datetime ->
           # TODO: update to more efficient `DateTime.from_naive!(naive_datetime, "Etc/UTC")` in Elixir 1.4
-          {:ok, datetime} = Elixir.Timex.Parse.DateTime.Parser.parse(NaiveDateTime.to_iso8601(naive_datetime), "{ISO:Extended:Z}")
-          datetime
+          Elixir.Timex.Parse.DateTime.Parser.parse(NaiveDateTime.to_iso8601(naive_datetime), "{ISO:Extended:Z}")
       end
     end
   end
@@ -219,10 +197,10 @@ defmodule Emissary.Rules do
   # date_value is used to calculate current_age per RFC7234§4.2.3. It returns integer UNIX seconds since the epoch, or :error if the response had no Date header (in violation of HTTP/1.1).
   def date_value(resp_headers) do
     case get_http_date(resp_headers, "date") do
+      {:ok, date} ->
+        Timex.to_unix(date)
       false ->
         :error
-      date ->
-        Timex.to_unix(date)
     end
   end
 
