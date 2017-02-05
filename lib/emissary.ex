@@ -2,6 +2,7 @@ defmodule Emissary do
   use Application
 
   @cache_max_bytes 1_000_000_000
+  @port 8080
   # \todo add follow-redirects config
 
   # See http://elixir-lang.org/docs/stable/elixir/Application.html
@@ -10,7 +11,7 @@ defmodule Emissary do
     import Supervisor.Spec, warn: false
 
     children = [
-      Plug.Adapters.Cowboy.child_spec(:http, EmissaryRouter, [], [port: 8080]),
+      Plug.Adapters.Cowboy.child_spec(:http, EmissaryRouter, [], [port: @port]),
       worker(Emissary.RemapManager, [Emissary.RemapManager]),
       worker(Emissary.CacheManager, [Emissary.CacheManager, @cache_max_bytes]),
       worker(Emissary.RequestManager, [Emissary.RequestManager])
