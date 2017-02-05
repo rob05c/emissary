@@ -20,7 +20,7 @@ defmodule Emissary.RemapManager do
     {:reply, Map.fetch(rules, rule), rules}
   end
 
-  def read_remap_config() do
+  defp read_remap_config() do
     case File.read @file_path do
       {:ok, body} ->
         build_remap_config body
@@ -29,11 +29,11 @@ defmodule Emissary.RemapManager do
     end
   end
 
-  def comment?(l) do
+  defp comment?(l) do
     String.starts_with? String.trim_leading(l), "#"
   end
 
-  def build_remap_config(file) do
+  defp build_remap_config(file) do
     file
     |> String.split("\n", trim: true)
     |> Enum.reject(fn(l) -> comment?(l) end)
