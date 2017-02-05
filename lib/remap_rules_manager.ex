@@ -34,13 +34,12 @@ defmodule Emissary.RemapManager do
   end
 
   def build_remap_config(file) do
-    lines = String.split file, "\n", trim: true
-    lines = Enum.reject lines, fn(l) -> comment? l end
-    {_, rules} = Enum.map_reduce lines, %{}, fn(line, acc) ->
-      ["remap", from, to] = String.split line, " ", trim: true
-      acc = Map.put acc, from, to
-      {{from, to}, acc}
-    end
-    rules
+    file
+    |> String.split("\n", trim: true)
+    |> Enum.reject(fn(l) -> comment?(l) end)
+    |> Enum.reduce(%{}, fn(line, acc) ->
+      ["remap", from, to] = String.split(line, " ", trim: true)
+      Map.put(acc, from, to)
+    end)
   end
 end
