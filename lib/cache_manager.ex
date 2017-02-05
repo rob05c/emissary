@@ -111,10 +111,10 @@ defmodule Emissary.CacheManager do
           :must_revalidate ->
             IO.puts "revalidating cache " <> url
             origin_revalidate(url, resp)
-          :true ->
+          true ->
             IO.puts "using cached " <> url
             {:ok, resp.code, resp.headers, resp.body}
-          :false ->
+          false ->
             IO.puts "can't use cached " <> url
             origin_request(url, request_headers_list)
         end
