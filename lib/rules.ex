@@ -268,12 +268,6 @@ defmodule Emissary.Rules do
     end
   end
 
-  # # validated? checks the constraints in RFC7234§4 via RFC7234§4.3
-  # def validated?(resp_body) do
-
-  # end
-
-  # "Vary: accept-encoding, accept-language"
   # selected_headers_match? checks the constraints in RFC7234§4.1
   # \todo change caching to key on URL+headers, so multiple requests for the same URL with different vary headers can be cached?
   def selected_headers_match?(req_headers, resp_req_headers) do
