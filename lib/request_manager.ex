@@ -12,12 +12,10 @@ defmodule Emissary.RequestManager do
   end
 
   def headers_to_map(poison_response) do
-    {_, headers} = Enum.map_reduce poison_response, %{}, fn(header, acc) ->
+    Enum.reduce poison_response, %{}, fn(header, acc) ->
       {k, v} = header
-      acc = Map.put acc, String.downcase(k), v
-      {{k, v}, acc}
+      Map.put(acc, String.downcase(k), v)
     end
-    headers
   end
 
   def to_response(response, request_headers, request_time, response_time) do
