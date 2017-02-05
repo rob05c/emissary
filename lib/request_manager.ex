@@ -18,14 +18,14 @@ defmodule Emissary.RequestManager do
     end
   end
 
-  def to_response(response, request_headers, request_time, response_time) do
+  defp to_response(response, request_headers, request_time, response_time) do
     body = response.body
     code = response.status_code
     headers = headers_to_map(response.headers)
     %Response{body: body, code: code, headers: headers, request_headers: request_headers, request_time: request_time, response_time: response_time}
   end
 
-  def to_response(response_code, response_body, request_headers, request_time, response_time) do
+  defp to_response(response_code, response_body, request_headers, request_time, response_time) do
     body = response_body
     code = response_code
     headers = %{}
@@ -36,16 +36,12 @@ defmodule Emissary.RequestManager do
     GenServer.start_link(__MODULE__, :ok, name: name)
   end
 
-  def get(server, rule) do
-    GenServer.call(server, {:get, rule})
-  end
-
   def init(:ok) do
     data = %Data{request_pids: %{}, revalidate_pids: %{}}
     {:ok, data}
   end
 
-  def do_request(url) do
+  defp do_request(url) do
     request_time = DateTime.utc_now()
     # TODO: add request headers
     response = HTTPoison.get(url, [], [])
@@ -54,7 +50,7 @@ defmodule Emissary.RequestManager do
   end
 
   # TODO: add other revalidate mechanisms, like ETAG
-  def do_revalidate(url, old_response) do
+  defp do_revalidate(url, old_response) do
     request_time = DateTime.utc_now()
 
     headers = [] # TODO: add old_response.request_headers?
