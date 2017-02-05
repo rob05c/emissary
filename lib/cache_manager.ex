@@ -11,15 +11,15 @@ defmodule Emissary.CacheManager do
     GenServer.start_link __MODULE__, {name, max_bytes}, name: name
   end
 
-  def get(server, url) do
+  defp get(server, url) do
     GenServer.call server, {:get, url}
   end
 
-  def set(server, url, val) do
+  defp set(server, url, val) do
     GenServer.cast server, {:set, url, val}
   end
 
-  def delete(server, url) do
+  defp delete(server, url) do
     GenServer.cast server, {:delete, url}
   end
 
@@ -34,7 +34,7 @@ defmodule Emissary.CacheManager do
   end
 
   # freshen bumps url to the top of the LRU. Should be called after someone `get`s the url.
-  def freshen(data, url) do
+  defp freshen(data, url) do
     [{_, lru_index, _}] = :ets.lookup(data.table, url)
     :ets.delete(data.lru_table, lru_index)
 
@@ -46,7 +46,7 @@ defmodule Emissary.CacheManager do
   end
 
   # prune deletes entries in the cache, starting with the least-recently-used, until the cache bytes is within max_bytes.
-  def prune(data) do
+  defp prune(data) do
     if data.bytes <= data.max_bytes do
       data
     else
@@ -99,7 +99,7 @@ defmodule Emissary.CacheManager do
   # If the URL is already in the cache, and hasn't expired, it's returned from cache.
   # If the URL is not in the cache, or has expired, it's requested from its origin, and stored in the cache
   def fetch(request_headers_list, url) do
-    case Emissary.CacheManager.get Emissary.CacheManager, url do
+    case get Emissary.CacheManager, url do
       {:ok, resp} ->
         IO.puts "found in cache " <> url
         req_headers = Emissary.RequestManager.headers_to_map(request_headers_list)
@@ -124,7 +124,7 @@ defmodule Emissary.CacheManager do
     end
   end
 
-  def origin_request(url, request_headers_list) do
+  defp origin_request(url, request_headers_list) do
         IO.puts "getting from origin `" <> url <> "`"
         # \todo fix query params
 
@@ -133,7 +133,7 @@ defmodule Emissary.CacheManager do
         {:ok, resp.code, resp.headers, resp.body}
   end
 
-  def origin_revalidate(url, old_response) do
+  defp origin_revalidate(url, old_response) do
     IO.puts "revalidating from origin `" <> url <> "`"
     resp = Emissary.RequestManager.revalidate(url, old_response)
     if cache url, resp do
@@ -141,18 +141,18 @@ defmodule Emissary.CacheManager do
     else
       IO.puts "revalidate can't cache, deleting old cached `" <> url <> "`"
       # TODO: determine if this should be serialised with cache(), to avoid race deleting a newly cached val
-      Emissary.CacheManager.delete(Emissary.CacheManager, url)
+      delete(Emissary.CacheManager, url)
     end
     {:ok, resp.code, resp.headers, resp.body}
   end
 
-  def cache(url, resp) do
+  defp cache(url, resp) do
     if Emissary.Rules.can_cache? resp.request_headers, resp.code, resp.headers do
       req_cache_control = Emissary.CacheControl.parse(resp.request_headers)
       IO.puts("cache_control:")
       IO.inspect(req_cache_control)
       IO.puts "caching " <> url
-      Emissary.CacheManager.set(Emissary.CacheManager, url, resp)
+      set(Emissary.CacheManager, url, resp)
       true
     else
       IO.puts "can't cache " <> url
