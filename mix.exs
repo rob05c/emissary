@@ -14,7 +14,7 @@ defmodule Emissary.Mixfile do
   #
   # Type "mix help compile.app" for more information
   def application do
-    [applications: [:logger, :cowboy, :plug, :httpoison],
+    [applications: [:logger, :cowboy, :plug, :httpoison, :timex],
      mod: {Emissary, []}]
   end
 
@@ -31,7 +31,8 @@ defmodule Emissary.Mixfile do
     [
       {:cowboy, "~> 1.0.0"},
       {:plug, "~> 1.0"},
-      {:httpoison, "~> 0.10.0"}
+      {:httpoison, "~> 0.10.0"},
+      {:timex, "~> 3.0"}
     ]
   end
 end

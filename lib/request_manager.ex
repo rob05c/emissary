@@ -14,14 +14,16 @@ defmodule Emissary.RequestManager do
   end
 
   def do_request(url) do
+    request_time = DateTime.utc_now()
     response = HTTPoison.get(url, [], [])
-    GenServer.cast Emissary.RequestManager, {:response, {url, response}}
+    response_time = DateTime.utc_now()
+    GenServer.cast Emissary.RequestManager, {:response, {url, response, request_time, response_time}}
   end
 
-  def handle_cast({:response, {url, response}}, url_pids) do
+  def handle_cast({:response, {url, response, request_time, response_time}}, url_pids) do
     pids = Map.fetch! url_pids, url
     Enum.each pids, fn(pid) ->
-      send pid, {:ok, response}
+      send pid, {:ok, response, request_time, response_time}
     end
     url_pids = Map.delete url_pids, url
     {:noreply, url_pids}
@@ -42,8 +44,8 @@ defmodule Emissary.RequestManager do
   def request(url) do
     GenServer.cast Emissary.RequestManager, {:request, {url, self()}}
     receive do
-      {:ok, response} ->
-        response
+      {:ok, response, request_time, response_time} ->
+        {response, request_time, response_time}
     end
   end
 end
