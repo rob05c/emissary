@@ -7,6 +7,7 @@ defmodule Emissary do
 
   # See http://elixir-lang.org/docs/stable/elixir/Application.html
   # for more information on OTP Applications
+  @spec start(any, any) :: Supervisor.on_start
   def start(_type, _args) do
     import Supervisor.Spec, warn: false
 

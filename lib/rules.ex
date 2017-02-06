@@ -12,11 +12,13 @@ defmodule Emissary.Rules do
   @default_cacheable_response_codes MapSet.new([200, 203, 204, 206, 300, 301, 404, 405, 410, 414, 501])
 
   # code_understood? returns whether the given response code is understood by this cache. Required by RFC7234§3
+  @spec code_understood?(integer) :: boolean
   defp code_understood?(code) do
       MapSet.member?(@codes, code)
   end
 
   # \todo change to take Response?
+  @spec can_cache?(map, integer, map) :: boolean
   def can_cache?(req_headers, resp_code, resp_headers) do
     req_cache_control = Emissary.CacheControl.parse(req_headers)
     resp_cache_control = Emissary.CacheControl.parse(resp_headers)
@@ -27,6 +29,7 @@ defmodule Emissary.Rules do
 
   # can_store_response? checks the constraints in RFC7234§3.2
   # \todo ensure RFC7234§3.2 requirements that max-age=0, must-revlaidate, s-maxage=0 are revalidated
+  @spec can_store_authenticated?(map, map) :: boolean
   defp can_store_authenticated?(req_cache_control, resp_cache_control) do
     !Map.has_key?(req_cache_control,     "authorization")
     || Map.has_key?(resp_cache_control,  "must-revalidate")
@@ -35,6 +38,7 @@ defmodule Emissary.Rules do
   end
 
   # can_store_response? checks the constraints in RFC7234
+  @spec can_store_response?(integer, map, map, map) :: boolean
   defp can_store_response?(resp_code, resp_headers, req_cache_control, resp_cache_control) do
     code_understood?(resp_code)
     && !Map.has_key?(req_cache_control,  "no-store")
@@ -44,6 +48,7 @@ defmodule Emissary.Rules do
     && cache_control_allows?(resp_code, resp_headers, resp_cache_control)
   end
 
+  @spec cache_control_allows?(integer, map, map) :: boolean
   defp cache_control_allows?(resp_code, resp_headers, resp_cache_control) do
     Map.has_key?(resp_headers,  "expires")
     || Map.has_key?(resp_cache_control,  "max-age")
@@ -53,16 +58,19 @@ defmodule Emissary.Rules do
   end
 
   # extension_allows? returns whether a cache-control extension allows the response to be cached, per RFC7234§3 and RFC7234§5.2.3. Note this currently fulfills the literal wording of the section, but cache-control extensions may override any requirements, in which case the logic of can_cache? outside this function would have to be changed.
+  @spec extension_allows?() :: boolean
   defp extension_allows?() do
     false
   end
 
+  @spec code_default_cacheable?(integer) :: boolean
   defp code_default_cacheable?(resp_code) do
       MapSet.member?(@default_cacheable_response_codes, resp_code)
   end
 
   # can_reuse_stored? checks the constraints in RFC7234§4
   # returns true if the cached repsonse can be reused, false if it cannot, and :must_revalidate if it can be reused upon successful validation.
+  @spec can_reuse_stored?(map, map, map, map, map, DateTime, DateTime) :: boolean
   def can_reuse_stored?(req_headers, resp_headers, req_cache_control, resp_cache_control, resp_req_headers, resp_req_time, resp_resp_time) do
     # TODO: remove allowed_stale, check in cache manager after revalidate fails? (since RFC7234§4.2.4 prohibits serving stale response unless disconnected).
     cond do
@@ -89,12 +97,14 @@ defmodule Emissary.Rules do
   end
 
   # fresh? checks the constraints in RFC7234§4 via RFC7234§4.2
+  @spec fresh?(map, map, DateTime, DateTime) :: boolean
   defp fresh?(resp_headers, resp_cache_control, resp_req_time, resp_resp_time) do
     freshness_lifetime = get_freshness_lifetime(resp_headers, resp_cache_control)
     current_age = get_current_age(resp_headers, resp_req_time, resp_resp_time)
     freshness_lifetime > current_age
   end
 
+  @spec get_http_date(map, String.t) :: DateTime | boolean
   defp get_http_date(map, key) do
     case Map.fetch(map, key) do
       {:ok, http_date} ->
@@ -105,6 +115,7 @@ defmodule Emissary.Rules do
   end
 
   # TODO: change to return {:ok}, so false doesn't make case matching fail if the 'false' isn't first.
+  @spec get_http_delta_seconds(map, String.t) :: integer | boolean
   defp get_http_delta_seconds(map, key) do
     case Map.fetch(map, key) do
       {:ok, seconds_str} ->
@@ -120,6 +131,7 @@ defmodule Emissary.Rules do
   end
 
   # freshness_lifetime calculates the freshness_lifetime per RFC7234§4.2.1
+  @spec get_freshness_lifetime(map, map) :: integer
   defp get_freshness_lifetime(resp_headers, resp_cache_control) do
     get_s_maxage = fn() ->
       get_http_delta_seconds(resp_cache_control, "s-maxage")
@@ -149,6 +161,7 @@ defmodule Emissary.Rules do
 
   # heuristic_freshness follows the recommendation of RFC7234§4.2.2 and returns the min of 10% of the (Date - Last-Modified) headers and 24 hours, if they exist, and 24 hours if they don't.
   # TODO: smarter and configurable heuristics
+  @spec heuristic_freshness(map) :: integer
   defp heuristic_freshness(resp_headers) do
     case since_last_modified(resp_headers) do
       false ->
@@ -159,6 +172,7 @@ defmodule Emissary.Rules do
   end
 
   # TODO combine with get_expires?
+  @spec since_last_modified(map) :: integer
   defp since_last_modified(headers) do
     with {:ok, last_modified} <- get_http_date(headers, "last-modified"),
          {:ok, date} <- get_http_date(headers, "date"),
@@ -166,6 +180,7 @@ defmodule Emissary.Rules do
   end
 
   # parse_http_date parses the given HTTP-date (RFC7231§7.1.1) and returns a DateTime or :invalid
+  @spec parse_http_date(map) :: DateTime | boolean
   defp parse_http_date(http_date) do
     imf_fixdate_format = "%a, %d %b %Y %H:%M:%S GMT"
     obsolete_rfc850_format = "%A, %d-%b-%y %H:M:S GMT"
@@ -185,6 +200,7 @@ defmodule Emissary.Rules do
   end
 
   # age_value is used to calculate current_age per RFC7234§4.2.3
+  @spec age_value(map) :: integer
   defp age_value(resp_headers) do
     case get_http_delta_seconds(resp_headers, "age") do
       false ->
@@ -195,6 +211,7 @@ defmodule Emissary.Rules do
   end
 
   # date_value is used to calculate current_age per RFC7234§4.2.3. It returns integer UNIX seconds since the epoch, or :error if the response had no Date header (in violation of HTTP/1.1).
+  @spec date_value(map) :: integer | :error
   defp date_value(resp_headers) do
     case get_http_date(resp_headers, "date") do
       {:ok, date} ->
@@ -205,39 +222,48 @@ defmodule Emissary.Rules do
   end
 
   # get_now is used to calculate current_age per RFC7234§4.2.3. Returns integer UNIX seconds since the epoch.
+  @spec get_now() :: integer
   defp get_now() do
     Timex.to_unix(DateTime.utc_now())
   end
 
+  @spec request_time(DateTime) :: integer
   defp request_time(resp_req_time) do
     Timex.to_unix(resp_req_time)
   end
 
+  @spec response_time(DateTime) :: integer
   defp response_time(resp_resp_time) do
     Timex.to_unix(resp_resp_time)
   end
 
+  @spec apparent_age(map, DateTime) :: integer
   defp apparent_age(resp_headers, resp_resp_time) do
     max(0, response_time(resp_resp_time) - date_value(resp_headers))
   end
 
+  @spec apparent_age(DateTime, DateTime) :: integer
   defp response_delay(resp_req_time, resp_resp_time) do
     response_time(resp_resp_time) - request_time(resp_req_time)
   end
 
+  @spec corrected_age_value(map, DateTime, DateTime) :: integer
   defp corrected_age_value(resp_headers, resp_req_time, resp_resp_time) do
     age_value(resp_headers) + response_delay(resp_req_time, resp_resp_time)
   end
 
   # TODO: add config option to promise all caches in hop are HTTP/1.1, per RFC7234§4.2.3
+  @spec corrected_initial_age(map, DateTime, DateTime) :: integer
   defp corrected_initial_age(resp_headers, resp_req_time, resp_resp_time) do
     max(apparent_age(resp_headers, resp_resp_time), corrected_age_value(resp_headers, resp_req_time, resp_resp_time))
   end
 
+  @spec resident_time(DateTime) :: integer
   defp resident_time(resp_resp_time) do
     get_now() - response_time(resp_resp_time)
   end
 
+  @spec get_current_age(map, DateTime, DateTime) :: integer
   defp get_current_age(resp_headers, resp_req_time, resp_resp_time) do
     corrected_initial_age(resp_headers, resp_req_time, resp_resp_time) + resident_time(resp_resp_time)
   end
@@ -248,6 +274,7 @@ defmodule Emissary.Rules do
   # TODO: add warning generation funcs
 
   # allowed_stale? checks the constraints in RFC7234§4 via RFC7234§4.2.4
+  @spec allowed_stale?(map, map, map, DateTime, DateTime) :: boolean
   defp allowed_stale?(resp_headers, req_cache_control, resp_cache_control, resp_req_time, resp_resp_time) do
     (!Map.has_key?(req_cache_control, "max-age") || Map.has_key?(req_cache_control, "max-stale"))
     && !Map.has_key?(resp_cache_control, "must-revalidate")
@@ -257,6 +284,7 @@ defmodule Emissary.Rules do
   end
 
   # in_max_stale? returns whether the given response is within the `max-stale` request directive. If no `max-stale` directive exists in the request, `true` is returned.
+  @spec in_max_stale?(map, map, DateTime, DateTime) :: boolean
   defp in_max_stale?(resp_headers, resp_cache_control, resp_req_time, resp_resp_time) do
     case get_http_delta_seconds(resp_cache_control, "max-stale") do
       false ->
@@ -270,6 +298,7 @@ defmodule Emissary.Rules do
 
   # selected_headers_match? checks the constraints in RFC7234§4.1
   # \todo change caching to key on URL+headers, so multiple requests for the same URL with different vary headers can be cached?
+  @spec selected_headers_match?(map, map) :: boolean
   defp selected_headers_match?(req_headers, resp_req_headers) do
     case Map.fetch(req_headers,  "vary") do
       {:ok, vary_header} ->
@@ -290,6 +319,7 @@ defmodule Emissary.Rules do
   end
 
   # has_pragma_no_cache? returns whether the given headers have a `pragma: no-cache` which is to be considered per HTTP/1.1. This specifically returns false if `cache-control` exists, even if `pragma: no-cache` exists, per RFC7234§5.4
+  @spec has_pragma_no_cache?(map) :: boolean
   defp has_pragma_no_cache?(req_headers) do
     !Map.has_key?(req_headers, "cache-control")
     && Map.has_key?(req_headers, "pragma")

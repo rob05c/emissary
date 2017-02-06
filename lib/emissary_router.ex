@@ -4,7 +4,8 @@ defmodule EmissaryRouter do
   plug :match
   plug :dispatch
 
-  def add_qs(qs) do
+  @spec add_qs(String.t) :: String.t
+  defp add_qs(qs) do
     if qs == "" do
       ""
     else
@@ -12,7 +13,8 @@ defmodule EmissaryRouter do
     end
   end
 
-  def domain_to_remap(conn) do
+  @spec domain_to_remap(Plug.Conn) :: String.t
+  defp domain_to_remap(conn) do
     Atom.to_string(conn.scheme) <> "://" <> conn.host
   end
 

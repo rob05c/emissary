@@ -1,5 +1,7 @@
 defmodule Emissary.CacheControl do
   # \todo downcase keys
+
+  @spec parse(list) :: map
   def parse(headers) do
     case Map.fetch(headers, "cache-control") do
       {:ok, cache_control_str} ->
@@ -9,10 +11,12 @@ defmodule Emissary.CacheControl do
     end
   end
 
+  @spec parse_str(String.t) :: map
   defp parse_str(s) do
     parse_key(s, %{})
   end
 
+  @spec next_tok(integer | :nomatch, integer | :nomatch) :: :equal | :comma | :neither
   defp next_tok(equal_pos, comma_pos) do
     cond do
       equal_pos == :nomatch && comma_pos == :nomatch ->
@@ -32,6 +36,7 @@ defmodule Emissary.CacheControl do
     end
   end
 
+  @spec parse_key(String.t, map) :: map
   defp parse_key(s, acc) do
     s = String.lstrip(s)
     equal_pos = :binary.match s, "="
@@ -54,6 +59,7 @@ defmodule Emissary.CacheControl do
     end
   end
 
+  @spec parse_val(String.t, String.t, map) :: map
   defp parse_val(s, key, acc) do
     s = String.lstrip(s)
     if String.at(s, 0) == "\"" do
@@ -63,6 +69,7 @@ defmodule Emissary.CacheControl do
     end
   end
 
+  @spec parse_quoted_val(String.t, String.t, map) :: map
   defp parse_quoted_val(s, key, acc) do
     quote_pos = end_quote_pos(s, 1)
     if quote_pos == :nomatch do
@@ -84,6 +91,7 @@ defmodule Emissary.CacheControl do
     end
   end
 
+  @spec end_quote_pos(String.t, integer) :: integer | :nomatch
   defp end_quote_pos(s, start) do
     IO.puts "end_quote_pos s " <> s <> " start " <> Integer.to_string(start)
     s_start = String.slice(s, start, byte_size(s))
@@ -105,6 +113,7 @@ defmodule Emissary.CacheControl do
     end
   end
 
+  @spec parse_unquoted_val(String.t, integer, map) :: map
   defp parse_unquoted_val(s, key, acc) do
     comma_pos = :binary.match s, ","
     case comma_pos do

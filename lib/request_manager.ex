@@ -11,6 +11,7 @@ defmodule Emissary.RequestManager do
     defstruct request_pids: %{}, revalidate_pids: %{}
   end
 
+  @spec headers_to_map(HTTPoison.Response) :: %{String.t => String.t}
   def headers_to_map(poison_response) do
     Enum.reduce poison_response, %{}, fn(header, acc) ->
       {k, v} = header
@@ -18,6 +19,7 @@ defmodule Emissary.RequestManager do
     end
   end
 
+  @spec to_response(HTTPoison.Response, %{}, DateTime, DateTime) :: Response
   defp to_response(response, request_headers, request_time, response_time) do
     body = response.body
     code = response.status_code
@@ -25,6 +27,7 @@ defmodule Emissary.RequestManager do
     %Response{body: body, code: code, headers: headers, request_headers: request_headers, request_time: request_time, response_time: response_time}
   end
 
+  @spec to_response(integer, binary, %{}, DateTime, DateTime) :: Response
   defp to_response(response_code, response_body, request_headers, request_time, response_time) do
     body = response_body
     code = response_code
@@ -32,15 +35,18 @@ defmodule Emissary.RequestManager do
     %Response{body: body, code: code, headers: headers, request_headers: request_headers, request_time: request_time, response_time: response_time}
   end
 
+  @spec start_link(String.t) :: GenServer.on_start
   def start_link(name) do
     GenServer.start_link(__MODULE__, :ok, name: name)
   end
 
+  @spec init(:ok) :: {:ok, Data}
   def init(:ok) do
     data = %Data{request_pids: %{}, revalidate_pids: %{}}
     {:ok, data}
   end
 
+  @spec do_request(String.t) :: :ok
   defp do_request(url) do
     request_time = DateTime.utc_now()
     # TODO: add request headers
@@ -50,6 +56,7 @@ defmodule Emissary.RequestManager do
   end
 
   # TODO: add other revalidate mechanisms, like ETAG
+  @spec do_revalidate(String.t, Response) :: :ok
   defp do_revalidate(url, old_response) do
     request_time = DateTime.utc_now()
 
@@ -70,6 +77,7 @@ defmodule Emissary.RequestManager do
     GenServer.cast Emissary.RequestManager, {:revalidate_response, {url, response, request_time, response_time}}
   end
 
+  @spec handle_cast({:response, {String.t, Response, DateTime, DateTime}}, Data) :: {:noreply, Data}
   def handle_cast({:response, {url, response, request_time, response_time}}, data) do
     url_pids = data.request_pids
     pids = Map.fetch! url_pids, url
@@ -81,6 +89,7 @@ defmodule Emissary.RequestManager do
     {:noreply, data}
   end
 
+  @spec handle_cast({:revalidate_response, {String.t, Response, DateTime, DateTime}}, Data) :: {:noreply, Data}
   def handle_cast({:revalidate_response, {url, response, request_time, response_time}}, data) do
     url_pids = data.revalidate_pids
     pids = Map.fetch! url_pids, url
@@ -93,6 +102,7 @@ defmodule Emissary.RequestManager do
   end
 
   # TODO: add request headers
+  @spec handle_cast({:request, {String.t, PID}}, Data) :: {:noreply, Data}
   def handle_cast({:request, {url, pid}}, data) do
     url_pids = data.request_pids
     pids = Map.get url_pids, url, []
@@ -108,6 +118,7 @@ defmodule Emissary.RequestManager do
   end
 
   # TODO: abstract duplicate pid-reply code?
+  @spec handle_cast({:revalidate, {String.t, Response, PID}}, Data) :: {:noreply, Data}
   def handle_cast({:revalidate, {url, response, pid}}, data) do
     url_pids = data.revalidate_pids
     pids = Map.get url_pids, url, []
@@ -122,6 +133,7 @@ defmodule Emissary.RequestManager do
     {:noreply, data}
   end
 
+  @spec request(String.t, [{String.t, String.t}]) :: Response
   def request(url, request_headers_list) do
     GenServer.cast Emissary.RequestManager, {:request, {url, self()}}
     request_headers = headers_to_map(request_headers_list)
@@ -141,6 +153,7 @@ defmodule Emissary.RequestManager do
     end
   end
 
+  @spec revalidate(String.t, Response) :: Response
   def revalidate(url, old_resp) do
     GenServer.cast Emissary.RequestManager, {:revalidate, {url, old_resp, self()}}
     receive do
