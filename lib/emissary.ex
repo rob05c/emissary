@@ -3,7 +3,7 @@ defmodule Emissary do
 
   @cache_max_bytes 1_000_000_000
   @port 8080
-  # \todo add follow-redirects config
+  # TODO: add follow-redirects config
 
   # See http://elixir-lang.org/docs/stable/elixir/Application.html
   # for more information on OTP Applications

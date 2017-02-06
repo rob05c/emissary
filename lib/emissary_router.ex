@@ -36,7 +36,7 @@ defmodule EmissaryRouter do
         |> delete_resp_header("max-age")
         |> delete_resp_header("cache-control")
 
-        # \todo figure out how to delete server,date,content-length from Plug/Cowboy, and stop downcasing cached headers
+        # TODO: figure out how to delete server,date,content-length from Plug/Cowboy, and stop downcasing cached headers
 
         headers
         |> Enum.reduce(conn, fn({k, v}, conn) ->

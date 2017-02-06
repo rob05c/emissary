@@ -30,7 +30,7 @@ defmodule Emissary.RemapManager do
       {:ok, body} ->
         build_remap_config body
       {:error, _} ->
-        %{} # \todo warn?
+        %{} # TODO warn?
     end
   end
 

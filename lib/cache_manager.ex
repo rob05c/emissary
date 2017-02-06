@@ -1,7 +1,7 @@
 defmodule Emissary.CacheManager do
   use GenServer
 
-  # \todo change to use Erlang Term Storage
+  # TODO: change to use Erlang Term Storage
   defmodule CacheData do
     @enforce_keys [:table, :lru_table, :max_bytes]
     defstruct table: "", lru_table: "", bytes: 0, max_bytes: 0
@@ -29,7 +29,7 @@ defmodule Emissary.CacheManager do
 
   @spec init({String.t, integer}) :: {:ok, %CacheData{}}
   def init({name, max_bytes}) do
-    # \todo determine if read_concurrency should be true. GenServer means only one process ever reads at a time, right?
+    # TODO: determine if read_concurrency should be true. GenServer means only one process ever reads at a time, right?
     :ets.new(name, [:named_table, :public, {:read_concurrency, true}])
     lru_table = :"#{name}_lru"
     :ets.new(lru_table, [:named_table, :ordered_set])
@@ -44,7 +44,7 @@ defmodule Emissary.CacheManager do
     [{_, lru_index, _}] = :ets.lookup(data.table, url)
     :ets.delete(data.lru_table, lru_index)
 
-      # \todo abstract index-and-insert duplicated in set()
+      # TODO: abstract index-and-insert duplicated in set()
     new_lru_index = :erlang.unique_integer([:monotonic])
     :ets.insert(data.lru_table, {new_lru_index, url})
     :ets.update_element(data.table, url, [{2, new_lru_index}])
@@ -138,7 +138,7 @@ defmodule Emissary.CacheManager do
   @spec origin_request(String.t, [{String.t, String.t}]) :: {:ok, integer, map, binary}
   defp origin_request(url, request_headers_list) do
     IO.puts "getting from origin `" <> url <> "`"
-    # \todo fix query params
+    # TODO: fix query params
 
     resp = Emissary.RequestManager.request(url, request_headers_list)
     cache(url, resp)

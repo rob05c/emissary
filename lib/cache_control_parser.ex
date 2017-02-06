@@ -1,5 +1,5 @@
 defmodule Emissary.CacheControl do
-  # \todo downcase keys
+  # TODO: downcase keys
 
   @spec parse(list) :: map
   def parse(headers) do

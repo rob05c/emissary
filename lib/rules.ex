@@ -6,7 +6,7 @@ defmodule Emissary.Rules do
       300, 301, 302, 303, 304, 305, 306, 307, 308,
       400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 421, 422, 423, 424, 428, 429, 431, 451,
       500, 501, 502, 503, 504, 505, 506, 507, 508, 510, 511
-      # \todo add unofficial (e.g. Nginx, Cloudflare) codes?
+      # TODO: add unofficial (e.g. Nginx, Cloudflare) codes?
     ])
 
   @default_cacheable_response_codes MapSet.new([200, 203, 204, 206, 300, 301, 404, 405, 410, 414, 501])
@@ -17,18 +17,18 @@ defmodule Emissary.Rules do
       MapSet.member?(@codes, code)
   end
 
-  # \todo change to take Response?
+  # TODO: change to take Response?
   @spec can_cache?(map, integer, map) :: boolean
   def can_cache?(req_headers, resp_code, resp_headers) do
     req_cache_control = Emissary.CacheControl.parse(req_headers)
     resp_cache_control = Emissary.CacheControl.parse(resp_headers)
     can_store_response?(resp_code, resp_headers, req_cache_control, resp_cache_control)
-    # \todo implement RFC7234§3.1 incomplete response storage
+    # TODO: implement RFC7234§3.1 incomplete response storage
     && can_store_authenticated?(req_cache_control, resp_cache_control)
   end
 
   # can_store_response? checks the constraints in RFC7234§3.2
-  # \todo ensure RFC7234§3.2 requirements that max-age=0, must-revlaidate, s-maxage=0 are revalidated
+  # TODO: ensure RFC7234§3.2 requirements that max-age=0, must-revlaidate, s-maxage=0 are revalidated
   @spec can_store_authenticated?(map, map) :: boolean
   defp can_store_authenticated?(req_cache_control, resp_cache_control) do
     !Map.has_key?(req_cache_control,     "authorization")
@@ -297,7 +297,7 @@ defmodule Emissary.Rules do
   end
 
   # selected_headers_match? checks the constraints in RFC7234§4.1
-  # \todo change caching to key on URL+headers, so multiple requests for the same URL with different vary headers can be cached?
+  # TODO: change caching to key on URL+headers, so multiple requests for the same URL with different vary headers can be cached?
   @spec selected_headers_match?(map, map) :: boolean
   defp selected_headers_match?(req_headers, resp_req_headers) do
     case Map.fetch(req_headers,  "vary") do
@@ -305,7 +305,7 @@ defmodule Emissary.Rules do
         if vary_header == "*" do
           false
         else
-          # \todo extract method?
+          # TODO: extract method?
           vary_header
           |> String.downcase
           |> String.split(",")
