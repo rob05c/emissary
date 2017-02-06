@@ -1,5 +1,7 @@
 defmodule EmissaryRouter do
   use Plug.Router
+  alias Emissary.CacheManager, as: CacheManager
+  alias Emissary.RemapManager, as: RemapManager
 
   plug :match
   plug :dispatch
@@ -22,12 +24,12 @@ defmodule EmissaryRouter do
     request_domain = domain_to_remap(conn)
     request_headers = conn.req_headers
 
-    case Emissary.RemapManager.get(Emissary.RemapManager, request_domain) do
+    case RemapManager.get(Emissary.RemapManager, request_domain) do
       {:ok, remapped_domain} ->
         remapped_url = remapped_domain <> conn.request_path <> add_qs(conn.query_string)
 
         IO.puts "getting " <> remapped_url
-        {:ok, code, headers, body} = Emissary.CacheManager.fetch(request_headers, remapped_url)
+        {:ok, code, headers, body} = CacheManager.fetch(request_headers, remapped_url)
 
         conn = conn
         |> put_resp_header("server", "")

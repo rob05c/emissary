@@ -1,6 +1,8 @@
 defmodule Emissary do
   use Application
-
+  alias Emissary.RemapManager, as: RemapManager
+  alias Emissary.CacheManager, as: CacheManager
+  alias Emissary.RequestManager, as: RequestManager
   @cache_max_bytes 1_000_000_000
   @port 8080
   # TODO: add follow-redirects config
@@ -13,9 +15,9 @@ defmodule Emissary do
 
     children = [
       Plug.Adapters.Cowboy.child_spec(:http, EmissaryRouter, [], [port: @port]),
-      worker(Emissary.RemapManager, [Emissary.RemapManager]),
-      worker(Emissary.CacheManager, [Emissary.CacheManager, @cache_max_bytes]),
-      worker(Emissary.RequestManager, [Emissary.RequestManager])
+      worker(RemapManager, [RemapManager]),
+      worker(CacheManager, [CacheManager, @cache_max_bytes]),
+      worker(RequestManager, [RequestManager])
       # Starts a worker by calling: Emissary.Worker.start_link(arg1, arg2, arg3)
       # worker(Emissary.Worker, [arg1, arg2, arg3]),
     ]

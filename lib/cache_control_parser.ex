@@ -48,12 +48,12 @@ defmodule Emissary.CacheControl do
       :equal ->
         {equal_i, _} = equal_pos
         key = String.slice(s, 0, equal_i)
-        s = String.slice(s, equal_i+1, byte_size(s))
+        s = String.slice(s, equal_i + 1, byte_size(s))
         parse_val(s, key, acc)
       :comma ->
         {comma_i, _} = comma_pos
         key = String.slice(s, 0, comma_i)
-        s = String.slice(s, comma_i+1, byte_size(s))
+        s = String.slice(s, comma_i + 1, byte_size(s))
         acc = Map.put acc, key, nil
         parse_key(s, acc)
     end
@@ -79,12 +79,12 @@ defmodule Emissary.CacheControl do
       val = String.slice(s, 1, quote_pos)
       IO.puts "val: '" <> val <> "'"
       acc = Map.put acc, key, val
-      s = String.slice(s, quote_pos+1, byte_size(s))
+      s = String.slice(s, quote_pos + 1, byte_size(s))
       case :binary.match s, "," do
         :nomatch ->
           acc
         {comma_i, _} ->
-          s = String.slice(s, comma_i+1, byte_size(s))
+          s = String.slice(s, comma_i + 1, byte_size(s))
           parse_key s, acc
       end
 
@@ -108,7 +108,7 @@ defmodule Emissary.CacheControl do
         start + quote_i - 1
       else
         IO.puts "end_quote_pos recursing start + quote_i + 1 " <> Integer.to_string(start) <> "+" <> Integer.to_string(quote_i) <> "+1"
-        end_quote_pos(s, start+quote_i+1)
+        end_quote_pos(s, start + quote_i + 1)
       end
     end
   end
@@ -119,7 +119,7 @@ defmodule Emissary.CacheControl do
     case comma_pos do
       {comma_i, _} ->
         val = String.slice(s, 0, comma_i)
-        s = String.slice(s, comma_i+1, byte_size(s))
+        s = String.slice(s, comma_i + 1, byte_size(s))
         acc = Map.put acc, key, val
         parse_key s, acc
       :nomatch ->

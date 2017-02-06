@@ -25,7 +25,7 @@ defmodule Emissary.RemapManager do
   end
 
   @spec read_remap_config() :: map
-  defp read_remap_config() do
+  defp read_remap_config do
     case File.read @file_path do
       {:ok, body} ->
         build_remap_config body

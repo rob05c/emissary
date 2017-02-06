@@ -1,5 +1,10 @@
 defmodule Emissary.CacheManager do
   use GenServer
+  alias Emissary.RequestManager.Response, as: Response
+  alias Emissary.CacheControl, as: CacheControl
+  alias Emissary.CacheManager, as: CacheManager
+  alias Emissary.RequestManager, as: RequestManager
+  alias Emissary.Rules, as: Rules
 
   # TODO: change to use Erlang Term Storage
   defmodule CacheData do
@@ -12,12 +17,12 @@ defmodule Emissary.CacheManager do
     GenServer.start_link __MODULE__, {name, max_bytes}, name: name
   end
 
-  @spec get(GenServer.server, String.t) :: {:reply, {:ok, %Emissary.RequestManager.Response{}} | :error, %CacheData{}}
+  @spec get(GenServer.server, String.t) :: {:reply, {:ok, Response} | :error, %CacheData{}}
   defp get(server, url) do
     GenServer.call server, {:get, url}
   end
 
-  @spec set(GenServer.server, String.t, %Emissary.RequestManager.Response{}) :: :ok
+  @spec set(GenServer.server, String.t, Response) :: :ok
   defp set(server, url, val) do
     GenServer.cast server, {:set, url, val}
   end
@@ -69,7 +74,7 @@ defmodule Emissary.CacheManager do
     end
   end
 
-  @spec handle_call({:get, String.t}, any, %CacheData{}) :: {:reply, {:ok, %Emissary.RequestManager.Response{}} | :error, %CacheData{}}
+  @spec handle_call({:get, String.t}, any, %CacheData{}) :: {:reply, {:ok, Response} | :error, %CacheData{}}
   def handle_call({:get, url}, _from, data) do
     reply = case :ets.lookup(data.table, url) do
               [{_, _, val}] ->
@@ -81,7 +86,7 @@ defmodule Emissary.CacheManager do
     {:reply, reply, data}
   end
 
-  @spec handle_cast({:set, String.t}, %Emissary.RequestManager.Response{}) :: {:noreply, %CacheData{}}
+  @spec handle_cast({:set, String.t}, Response) :: {:noreply, %CacheData{}}
   def handle_cast({:set, url, val}, data) do
     lru_index = :erlang.unique_integer([:monotonic])
     :ets.insert(data.lru_table, {lru_index, url})
@@ -94,7 +99,7 @@ defmodule Emissary.CacheManager do
     {:noreply, data}
   end
 
-  @spec handle_cast({:delete, String.t}, %Emissary.RequestManager.Response{}) :: {:noreply, %CacheData{}}
+  @spec handle_cast({:delete, String.t}, Response) :: {:noreply, %CacheData{}}
   def handle_cast({:delete, url}, data) do
     [{_, lru_index, val}] = :ets.lookup(data.table, url)
     :ets.delete(data.lru_table, lru_index)
@@ -110,15 +115,15 @@ defmodule Emissary.CacheManager do
   # If the URL is not in the cache, or has expired, it's requested from its origin, and stored in the cache
   @spec fetch(map, String.t) :: {atom, integer, map, binary}
   def fetch(request_headers_list, url) do
-    case get Emissary.CacheManager, url do
+    case get CacheManager, url do
       {:ok, resp} ->
         IO.puts "found in cache " <> url
-        req_headers = Emissary.RequestManager.headers_to_map(request_headers_list)
+        req_headers = RequestManager.headers_to_map(request_headers_list)
         # TODO: put in Response struct?
-        resp_req_cache_control = Emissary.CacheControl.parse(resp.request_headers)
-        resp_cache_control = Emissary.CacheControl.parse(resp.headers)
+        resp_req_cache_control = CacheControl.parse(resp.request_headers)
+        resp_cache_control = CacheControl.parse(resp.headers)
 
-        case Emissary.Rules.can_reuse_stored? req_headers, resp.headers, resp_req_cache_control, resp_cache_control, resp.request_headers, resp.request_time, resp.response_time do
+        case Rules.can_reuse_stored? req_headers, resp.headers, resp_req_cache_control, resp_cache_control, resp.request_headers, resp.request_time, resp.response_time do
           :must_revalidate ->
             IO.puts "revalidating cache " <> url
             origin_revalidate(url, resp)
@@ -140,15 +145,15 @@ defmodule Emissary.CacheManager do
     IO.puts "getting from origin `" <> url <> "`"
     # TODO: fix query params
 
-    resp = Emissary.RequestManager.request(url, request_headers_list)
+    resp = RequestManager.request(url, request_headers_list)
     cache(url, resp)
     {:ok, resp.code, resp.headers, resp.body}
   end
 
-  @spec origin_revalidate(String.t, %Emissary.RequestManager.Response{}) :: {:ok, integer, map, binary}
+  @spec origin_revalidate(String.t, Response) :: {:ok, integer, map, binary}
   defp origin_revalidate(url, old_response) do
     IO.puts "revalidating from origin `" <> url <> "`"
-    resp = Emissary.RequestManager.revalidate(url, old_response)
+    resp = RequestManager.revalidate(url, old_response)
     if cache url, resp do
       IO.puts "cached revalidated `" <> url <> "`"
     else
@@ -159,10 +164,10 @@ defmodule Emissary.CacheManager do
     {:ok, resp.code, resp.headers, resp.body}
   end
 
-  @spec cache(String.t, %Emissary.RequestManager.Response{}) :: boolean
+  @spec cache(String.t, Response) :: boolean
   defp cache(url, resp) do
-    if Emissary.Rules.can_cache? resp.request_headers, resp.code, resp.headers do
-      req_cache_control = Emissary.CacheControl.parse(resp.request_headers)
+    if Rules.can_cache? resp.request_headers, resp.code, resp.headers do
+      req_cache_control = CacheControl.parse(resp.request_headers)
       IO.puts("cache_control:")
       IO.inspect(req_cache_control)
       IO.puts "caching " <> url

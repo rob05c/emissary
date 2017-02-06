@@ -1,4 +1,5 @@
 defmodule Emissary.Rules do
+  alias Emissary.CacheControl, as: CacheControl
 
   @codes MapSet.new(
     [
@@ -20,8 +21,8 @@ defmodule Emissary.Rules do
   # TODO: change to take Response?
   @spec can_cache?(map, integer, map) :: boolean
   def can_cache?(req_headers, resp_code, resp_headers) do
-    req_cache_control = Emissary.CacheControl.parse(req_headers)
-    resp_cache_control = Emissary.CacheControl.parse(resp_headers)
+    req_cache_control = CacheControl.parse(req_headers)
+    resp_cache_control = CacheControl.parse(resp_headers)
     can_store_response?(resp_code, resp_headers, req_cache_control, resp_cache_control)
     # TODO: implement RFC7234§3.1 incomplete response storage
     && can_store_authenticated?(req_cache_control, resp_cache_control)
@@ -157,7 +158,7 @@ defmodule Emissary.Rules do
     end
   end
 
-  @seconds_in_24_hours 60*60*24
+  @seconds_in_24_hours 60 * 60 * 24
 
   # heuristic_freshness follows the recommendation of RFC7234§4.2.2 and returns the min of 10% of the (Date - Last-Modified) headers and 24 hours, if they exist, and 24 hours if they don't.
   # TODO: smarter and configurable heuristics
@@ -223,7 +224,7 @@ defmodule Emissary.Rules do
 
   # get_now is used to calculate current_age per RFC7234§4.2.3. Returns integer UNIX seconds since the epoch.
   @spec get_now() :: integer
-  defp get_now() do
+  defp get_now do
     Timex.to_unix(DateTime.utc_now())
   end
 
@@ -267,7 +268,6 @@ defmodule Emissary.Rules do
   defp get_current_age(resp_headers, resp_req_time, resp_resp_time) do
     corrected_initial_age(resp_headers, resp_req_time, resp_resp_time) + resident_time(resp_resp_time)
   end
-
 
   # TODO: add min-fresh check
 
